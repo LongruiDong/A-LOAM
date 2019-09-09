@@ -41,7 +41,7 @@
 #include <pcl/point_types.h>
 
 typedef pcl::PointXYZI PointType;
-
+// 角度和弧度互换
 inline double rad2deg(double radians)
 {
   return radians * 180.0 / M_PI;

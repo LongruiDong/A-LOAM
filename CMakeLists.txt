@@ -18,10 +18,12 @@ find_package(catkin REQUIRED COMPONENTS
   tf
 )
 
-#find_package(Eigen3 REQUIRED)
+#find_package(Eigen3 REQUIRED) 
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Ceres REQUIRED)
+
+include_directories( "/usr/include/eigen3/" )
 
 include_directories(
   include
