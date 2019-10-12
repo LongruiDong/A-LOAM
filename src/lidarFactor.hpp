@@ -139,7 +139,7 @@ struct LidarPlaneNormFactor
 
 
 struct LidarDistanceFactor
-{
+{//点对点ICP？
 
 	LidarDistanceFactor(Eigen::Vector3d curr_point_, Eigen::Vector3d closed_point_) 
 						: curr_point(curr_point_), closed_point(closed_point_){}
@@ -169,4 +169,46 @@ struct LidarDistanceFactor
 
 	Eigen::Vector3d curr_point;
 	Eigen::Vector3d closed_point;
+};
+
+
+//IMLS 点到平面ICP
+struct LidarPoint2PlaneICP
+{
+
+	LidarPoint2PlaneICP(Eigen::Vector3d curr_point_, Eigen::Vector3d closed_point_,
+						 Eigen::Vector3d closed_point_norm_) : curr_point(curr_point_), closed_point(closed_point_),
+														 closed_point_norm(closed_point_norm_) {}
+
+	template <typename T>
+	bool operator()(const T *q, const T *t, T *residual) const
+	{
+		Eigen::Quaternion<T> q_w_curr{q[3], q[0], q[1], q[2]};//输入的模型参数 4维
+		Eigen::Matrix<T, 3, 1> t_w_curr{t[0], t[1], t[2]};//输入的模型参数 3维
+		Eigen::Matrix<T, 3, 1> cp{T(curr_point.x()), T(curr_point.y()), T(curr_point.z())};
+		Eigen::Matrix<T, 3, 1> closedp{T(closed_point.x()), T(closed_point.y()), T(closed_point.z())};
+		Eigen::Matrix<T, 3, 1> point_w;
+		point_w = q_w_curr * cp + t_w_curr;
+
+		// res_x = point_w.x() - T(closed_point.x());
+		// res_y = point_w.y() - T(closed_point.y());
+		// res_z = point_w.z() - T(closed_point.z());
+		// Eigen::Matrix<T, 3, 1> pres{T(res_x), T(res_y), T(res_z)};//两点差值向量
+
+		Eigen::Matrix<T, 3, 1> norm{T(closed_point_norm.x()), T(closed_point_norm.y()), T(closed_point_norm.z())};//()or{}?
+		residual[0] = norm.dot(point_w - closedp);
+		return true;
+	}
+
+	static ceres::CostFunction *Create(const Eigen::Vector3d curr_point_, const Eigen::Vector3d closed_point_,
+									   const Eigen::Vector3d closed_point_norm_)
+	{
+		return (new ceres::AutoDiffCostFunction<
+				LidarPoint2PlaneICP, 1, 4, 3>(//这几个数字啥意思 1表示输出的residual维度，这里是1；输入维度分别是q=4,t=3
+			new LidarPoint2PlaneICP(curr_point_, closed_point_, closed_point_norm_)));
+	}
+
+	Eigen::Vector3d curr_point;
+	Eigen::Vector3d closed_point;
+	Eigen::Vector3d closed_point_norm;
 };
