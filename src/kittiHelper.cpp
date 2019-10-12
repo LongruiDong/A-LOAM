@@ -82,7 +82,7 @@ int main(int argc, char** argv)
     Eigen::Matrix3d R_transform;
     R_transform << 0, 0, 1, -1, 0, 0, 0, -1, 0; // 坐标系的一个旋转 ,为何要对gt 坐标系作此变换
     Eigen::Quaterniond q_transform(R_transform); //对应的四元数
-    cout << "q_transform: " << q_transform.coeffs() <<endl; //输出该旋转四元数 x,y,z,w
+    cout << "q_transform: " << q_transform.coeffs() <<endl; //输出该旋转四元数: x,y,z,w 0.5 -0.5 0.5 -0.5
 
     std::string line;
     std::size_t line_num = 0;

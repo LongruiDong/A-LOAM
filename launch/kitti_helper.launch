@@ -3,10 +3,10 @@
 
     <node name="kittiHelper" pkg="aloam_velodyne" type="kittiHelper" output="screen"> 
         <param name="dataset_folder" type="string" value="/home/dlr/Datasets/kitti-benchmark/dataset/" />
-        <param name="sequence_number" type="string" value="04" />
+        <param name="sequence_number" type="string" value="09" />
         <param name="to_bag" type="bool" value="true" />
         <!-- 把 点云、双目图、真实位姿输出为bag -->
-        <param name="output_bag_file" type="string" value="/home/dlr/catkin_ws2/src/A-LOAM/tmp/kitti.bag" /> <!-- replace with your output folder -->
+        <param name="output_bag_file" type="string" value="/home/dlr/catkin_ws2/src/A-LOAM/tmp/09.bag" /> <!-- replace with your output folder -->
         <param name="publish_delay" type="int" value="1" />  <!-- 这个延迟什么？ -->
     </node>
 </launch>

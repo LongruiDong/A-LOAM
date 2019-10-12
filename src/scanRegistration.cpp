@@ -87,7 +87,7 @@ ros::Publisher pubSurfPointsLessFlat;
 ros::Publisher pubRemovePoints; //去除点
 std::vector<ros::Publisher> pubEachScan;
 
-bool PUB_EACH_LINE = false;
+bool PUB_EACH_LINE = false;//用于调试
 
 double MINIMUM_RANGE = 0.1; //距离？
 //类型模板声明 PoinT
@@ -205,7 +205,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         }
         else if (N_SCANS == 64)
         {   
-            if (angle >= -8.83)
+            if (angle >= -8.83) //这个值是怎么来的， 24.33 8.83
                 scanID = int((2 - angle) * 3.0 + 0.5);
             else
                 scanID = N_SCANS / 2 + int((-8.83 - angle) * 2.0 + 0.5);
@@ -214,7 +214,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             if (angle > 2 || angle < -24.33 || scanID > 50 || scanID < 0)
             {
                 count--;
-                continue;
+                continue;//下个点
             }
         }
         else
@@ -222,7 +222,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             printf("wrong scan number\n");
             ROS_BREAK();
         }
-        printf("yang angle %f scanID %d \n", angle, scanID);//输出仰角和光束id
+        // printf("yang angle %f scanID %d \n", angle, scanID);//输出仰角和光束id
 
         float ori = -atan2(point.y, point.x);//该点方位角
         if (!halfPassed)//初始false
@@ -261,7 +261,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     }
     
     cloudSize = count;//过滤后的点数，有效范围内的所有点
-    printf("points size after sample %d \n", cloudSize);
+    printf("points size after pre-process %d \n", cloudSize);
 
     pcl::PointCloud<PointType>::Ptr laserCloud(new pcl::PointCloud<PointType>());
     for (int i = 0; i < N_SCANS; i++)
@@ -271,9 +271,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         scanEndInd[i] = laserCloud->size() - 6;
     }
 
-    printf("prepare time %f \n", t_prepare.toc());//提取特征前的准备时间
-
-    for (int i = 5; i < cloudSize - 5; i++)
+    printf("prepare time before select edge&planar %f \n", t_prepare.toc());//提取特征前的准备时间
+    //************ 对于imls-slam不需要提取这些特征点 但是为了undietort,需要一个位姿的估计
+    //计算曲率
+    for (int i = 5; i < cloudSize - 5; i++)//特征点只从[0,50]中挑选
     { //使用每个点的前后5个点计算曲率，因此前后5点均跳过
         float diffX = laserCloud->points[i - 5].x + laserCloud->points[i - 4].x + laserCloud->points[i - 3].x + laserCloud->points[i - 2].x + laserCloud->points[i - 1].x - 10 * laserCloud->points[i].x + laserCloud->points[i + 1].x + laserCloud->points[i + 2].x + laserCloud->points[i + 3].x + laserCloud->points[i + 4].x + laserCloud->points[i + 5].x;
         float diffY = laserCloud->points[i - 5].y + laserCloud->points[i - 4].y + laserCloud->points[i - 3].y + laserCloud->points[i - 2].y + laserCloud->points[i - 1].y - 10 * laserCloud->points[i].y + laserCloud->points[i + 1].y + laserCloud->points[i + 2].y + laserCloud->points[i + 3].y + laserCloud->points[i + 4].y + laserCloud->points[i + 5].y;
@@ -437,13 +438,14 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     printf("sort q time %f \n", t_q_sort);//排序时间
     printf("seperate points feature time %f \n", t_pts.toc());//提取特征点用时
 
+    /********************/
 
     sensor_msgs::PointCloud2 laserCloudOutMsg;
-    pcl::toROSMsg(*laserCloud, laserCloudOutMsg);//过滤后的点，按线储存的
+    pcl::toROSMsg(*laserCloud, laserCloudOutMsg);//过滤后的点，按线储存的 将传入下个节点
     laserCloudOutMsg.header.stamp = laserCloudMsg->header.stamp;
     laserCloudOutMsg.header.frame_id = "/camera_init";
     pubLaserCloud.publish(laserCloudOutMsg);
-
+    //*******************
     sensor_msgs::PointCloud2 cornerPointsSharpMsg;
     pcl::toROSMsg(cornerPointsSharp, cornerPointsSharpMsg);
     cornerPointsSharpMsg.header.stamp = laserCloudMsg->header.stamp;
@@ -467,7 +469,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     surfPointsLessFlat2.header.stamp = laserCloudMsg->header.stamp;
     surfPointsLessFlat2.header.frame_id = "/camera_init";
     pubSurfPointsLessFlat.publish(surfPointsLessFlat2);
-
+    /************************************************************************/
     // pub each scam
     if(PUB_EACH_LINE)
     {
@@ -481,7 +483,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         }
     }
 
-    printf("scan registration time %f ms *************\n", t_whole.toc());
+    printf("whole scan registration time %f ms ***********************\n \n", t_whole.toc()); //整个scan的注册过程用时
     if(t_whole.toc() > 100)
         ROS_WARN("scan registration process over 100ms");
 }
@@ -506,8 +508,9 @@ int main(int argc, char **argv)
     //订阅“/velodyne_points”节点,调用函数 laserCloudHandler 接受输入的激光点云消息
     ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, laserCloudHandler);
     //在对应topic发布 点云类型的消息
-    pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);
+    pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);//处理后的总点云，传给下个节点
 
+    //*****
     pubCornerPointsSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 100);
 
     pubCornerPointsLessSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_sharp", 100);
@@ -515,11 +518,12 @@ int main(int argc, char **argv)
     pubSurfPointsFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_flat", 100);
 
     pubSurfPointsLessFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 100);
+    //******
 
-    pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_remove_points", 100);
+    pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_remove_points", 100);//没有发布啊
 
     if(PUB_EACH_LINE)//默认false
-    {
+    {//通过观察rviz，scan00表示较远处（俯仰角大的），scan50俯仰角小的，离车体最近的
         for(int i = 0; i < N_SCANS; i++) //每条线
         {
             ros::Publisher tmp = nh.advertise<sensor_msgs::PointCloud2>("/laser_scanid_" + std::to_string(i), 100);
