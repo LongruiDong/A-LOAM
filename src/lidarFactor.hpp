@@ -196,7 +196,7 @@ struct LidarPoint2PlaneICP
 		// Eigen::Matrix<T, 3, 1> pres{T(res_x), T(res_y), T(res_z)};//两点差值向量
 
 		Eigen::Matrix<T, 3, 1> norm{T(closed_point_norm.x()), T(closed_point_norm.y()), T(closed_point_norm.z())};//()or{}?
-		residual[0] = norm.dot(point_w - closedp);
+		residual[0] = norm.dot(point_w - closedp);//本质上还是优化I?
 		return true;
 	}
 

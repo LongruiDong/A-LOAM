@@ -61,7 +61,7 @@ using std::sin;
 const double scanPeriod = 0.1;
 
 //初始化控制变量
-const int systemDelay = 3; // 弃用前x帧，不弃用 new feature: only first 10 frames to find edge$planar feature 4662
+const int systemDelay = 0; // 弃用前x帧，不弃用 new feature: only first 10 frames to find edge$planar feature 4662
 int systemInitCount = 0;// new:计数当前处理的帧序号
 bool systemInited = false;
 //扫描线数？怎么是0？
@@ -124,16 +124,6 @@ void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
 //从topic/velodyne_point获得消息中的输入点云；提取各类特征点
 void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 {
-    // if (!systemInited)
-    // {//丢弃前systemDelay帧点云 （为了确保有imu数据，但该版本不使用imu，所以不丢弃）
-    //     systemInitCount++;
-    //     if (systemInitCount >= systemDelay) //1>=0
-    //     {
-    //         systemInited = true;
-    //     }
-    //     else
-    //         return;
-    // }
 
     TicToc t_whole;
     TicToc t_prepare;
@@ -261,7 +251,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     }
     
     cloudSize = count;//过滤后的点数，有效范围内的所有点
-    printf("points size after pre-process %d \n", cloudSize);
+    printf("points size after pre-process scan %d : %d \n", systemInitCount, cloudSize);
 
     pcl::PointCloud<PointType>::Ptr laserCloud(new pcl::PointCloud<PointType>());
     for (int i = 0; i < N_SCANS; i++)
@@ -515,8 +505,8 @@ int main(int argc, char **argv)
 
     nh.param<double>("minimum_range", MINIMUM_RANGE, 0.1);//5 (kitti)
 
-    printf("scan line number %d \n", N_SCANS);//扫描线数
-    printf("minimum range %f \n", MINIMUM_RANGE); //确认参数
+    // printf("scan line number %d \n", N_SCANS);//扫描线数
+    printf("minimum range %f \n", MINIMUM_RANGE); //确认参数 remove too closed points
 
     if(N_SCANS != 16 && N_SCANS != 32 && N_SCANS != 64)
     {
@@ -538,7 +528,7 @@ int main(int argc, char **argv)
     pubSurfPointsLessFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 100);
     //******
 
-    pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_remove_points", 100);//没有发布啊 没有用到
+    // pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_remove_points", 100);//没有发布啊 没有用到
 
     if(PUB_EACH_LINE)//默认false
     {//通过观察rviz，scan00表示较远处（俯仰角大的），scan50俯仰角小的，离车体最近的

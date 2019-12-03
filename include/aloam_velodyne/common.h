@@ -41,6 +41,10 @@
 #include <pcl/point_types.h>
 
 typedef pcl::PointXYZI PointType;
+//建立 xyz类型
+typedef pcl::PointXYZ pointxyz;
+//建立xyzinormal类型
+typedef pcl::PointXYZINormal pointxyzinormal;
 
 inline double rad2deg(double radians)
 {

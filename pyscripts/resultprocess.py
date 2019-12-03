@@ -27,16 +27,26 @@ def fileToNumpy(filename):
     return dataArray
 
 
-path_file = "/home/dlr/myimls/src/A-LOAM/result"
+path_file = "/home/dlr/imlslam/src/A-LOAM/result"
 filename = "04raw-svd.txt" #
 fullpath = os.path.join(path_file, filename)
 dataArray = fileToNumpy(fullpath)
 # 使用数据集中给定的相机-lidar的校准文件把原始结果中的lidar坐标系转为相机坐标系！ calib_velo_to_cam.txt
-T_CV = np.load("/home/dlr/kitti/odometry_raw/2011_09_30/calib/T_CV.npy") #seq04-10
+# T_CV = np.load("/home/dlr/kitti/odometry_raw/2011_09_30/calib/T_CV.npy") #seq04-10
+
+''' Tr: -1.857739385241e-03 -9.999659513510e-01 -8.039975204516e-03 -4.784029760483e-03 
+     -6.481465826011e-03 8.051860151134e-03 -9.999466081774e-01 -7.337429464231e-02 
+     9.999773098287e-01 -1.805528627661e-03 -6.496203536139e-03 -3.339968064433e-01 '''
+ 
 # T_CV = np.load("/home/dlr/kitti/odometry_raw/2011_10_03/calib/T_CV.npy") #seq00-02
 # T_CV = np.load("/home/dlr/kitti/odometry_raw/2011_09_26/calib/T_CV.npy") #seq 03
+T_CV = np.loadtxt("/home/dlr/kitti/dataset/sequences/04/Tr.txt")
 Tcv = np.r_[T_CV,np.array([[0,0,0,1]])]
-# Tcv = np.array([[0,-1,0,0],[0,0,-1,0],[1,0,0,0],[0,0,0,1]])
+# seq 04 calib.txt Tr 使用这个 平移上结果 更小？ 待验证
+# Tcv = np.array([[-1.857739385241e-03,-9.999659513510e-01,-8.039975204516e-03,-4.784029760483e-03],
+#                 [-6.481465826011e-03,8.051860151134e-03,-9.999466081774e-01,-7.337429464231e-02],
+#                 [9.999773098287e-01,-1.805528627661e-03,-6.496203536139e-03,-3.339968064433e-01],
+#                 [0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00]])
 print(Tcv)
 Tvc = np.linalg.inv(Tcv) #注意这里！
 
@@ -51,22 +61,10 @@ T0 = dataArray[0] #(4,4)
 T0_inv = np.linalg.inv(T0)
 for k in range(dataArray.shape[0]): #1089
     T_k = dataArray[k]
-    # R_k4 = np.eye(4)
-    # R_k = T_k[0:3, 0:3]
-    # R_k4[0:3, 0:3] = R_k
-    # quaternion = tf.transformations.quaternion_from_matrix(R_k4)
-    # euler = tf.transformations.euler_from_quaternion(quaternion)
-    # roll = -euler[1]
-    # pitch = -euler[2]
-    # yaw = euler[0]
-    # tfmatrix = tf.transformations.compose_matrix(angles=np.array([roll, pitch, yaw]), 
-    #                                             translate=np.array([T_k[0, 3], T_k[1, 3], T_k[2, 3]]))
     dataArray[k] = np.matmul(T0_inv, T_k)
-    # dataArray[k] = T_k
-    # dataArray[k] = tfmatrix
 
 
-f = open("/home/dlr/myimls/src/A-LOAM/result/04-svd-600-50-gt1.txt", "w") #保存为新的gt位姿，初始为单位矩阵
+f = open("/home/dlr/imlslam/src/A-LOAM/result/04-svd-200-m100-r2k20.txt", "w") #保存为新的gt位姿，初始为单位矩阵
 for j in range(dataArray.shape[0]):
     slidt = [dataArray[j,0,0], dataArray[j,0,1], dataArray[j,0,2], dataArray[j,0,3],
                 dataArray[j,1,0], dataArray[j,1,1], dataArray[j,1,2], dataArray[j,1,3],
