@@ -31,7 +31,7 @@ def odom_callback_loam(data):
 	timeStamp = str(timeStampNum)
 	quaternion = (data.pose.pose.orientation.x, data.pose.pose.orientation.y, data.pose.pose.orientation.z, data.pose.pose.orientation.w)
 	
-	euler = tf.transformations.euler_from_quaternion(quaternion)
+	euler = tf.transformations.euler_from_quaternion(quaternion, axes='sxyz')
 	
 	tfmatrix = tf.transformations.compose_matrix(angles=np.array(euler), translate=np.array([data.pose.pose.position.x, 
 															data.pose.pose.position.y, data.pose.pose.position.z]))
@@ -54,5 +54,5 @@ def writeFile(file):
 	# trajectoryFile.close()
 	newtraj.close()
         
-if __name__ == '__main__':
-	writeFile('/home/dlr/imlslam/src/A-LOAM/result/04raw-svd.txt')
+if __name__ == '__main__':  #outlier rejection : 1 2 3
+	writeFile('/home/dlr/imlslam/src/A-LOAM/result/raw-04-calib-2imap-ds7orrdor.txt')

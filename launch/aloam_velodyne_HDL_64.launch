@@ -1,5 +1,8 @@
 <launch>
     
+    <!--- Sim Time -->
+    <!--param name="/use_sim_time" value="true" /-->
+    
     <param name="scan_line" type="int" value="64" /> <!--64线lidar-->
 
     <!-- if 1, do mapping 10 Hz, if 2, do mapping 5 Hz. Suggest to use 1, it will adjust frequence automaticlly -->
@@ -14,7 +17,7 @@
     <!-- 对应3个文件？ 和loam相比少了../src/transformMaintenance文件 -->
     <node pkg="aloam_velodyne" type="ascanRegistration" name="ascanRegistration" output="screen" />
 
-    <node pkg="aloam_velodyne" type="alaserOdometry" name="alaserOdometry" output="screen" />
+    <!--node pkg="aloam_velodyne" type="alaserOdometry" name="alaserOdometry" output="screen" / -->
 
     <node pkg="aloam_velodyne" type="alaserMapping" name="alaserMapping" output="screen" />
 

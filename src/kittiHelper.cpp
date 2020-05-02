@@ -23,6 +23,8 @@ using namespace std;
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
 
+#define ANGLE_CALIB 0.22 //需要校准的角度值
+
 // 读取kitti lidar .bin文件
 std::vector<float> read_lidar_data(const std::string lidar_data_path)
 {
@@ -54,6 +56,7 @@ int main(int argc, char** argv)
     publish_delay = publish_delay <= 0 ? 1 : publish_delay; // 参数值必须为正
     // 输入的激光点云节点 将在"/velodyne_points" topic上发布点云
     ros::Publisher pub_laser_cloud = n.advertise<sensor_msgs::PointCloud2>("/velodyne_points", 2);
+    ros::Publisher pub_laser_cloud_RAW = n.advertise<sensor_msgs::PointCloud2>("/velodyne_points_RAW", 2);
 
     image_transport::ImageTransport it(n);
     // 输入的双目图像节点
@@ -134,25 +137,42 @@ int main(int argc, char** argv)
 
         // read lidar point cloud
         std::stringstream lidar_data_path;
-        lidar_data_path << dataset_folder << "velodyne/sequences/" + sequence_number + "/velodyne/" 
+        lidar_data_path << dataset_folder << "sequences/" + sequence_number + "/velodyne/" //_filtered 0  去除动态物体
                         << std::setfill('0') << std::setw(6) << line_num << ".bin"; // 当前时刻的激光点云
         std::vector<float> lidar_data = read_lidar_data(lidar_data_path.str());
         std::cout << "totally " << lidar_data.size() / 4.0 << " points in this lidar frame \n"; // 一个点4个值
 
         std::vector<Eigen::Vector3d> lidar_points; // 3
         std::vector<float> lidar_intensities; // 1 强度？
-        pcl::PointCloud<pcl::PointXYZI> laser_cloud; // 点云数据结构
+        pcl::PointCloud<pcl::PointXYZI> laser_cloud; // 点云数据结构 已经做变换了
+        pcl::PointCloud<pcl::PointXYZI> laser_cloud_RAW; //原始点云
         for (std::size_t i = 0; i < lidar_data.size(); i += 4)
         {
             lidar_points.emplace_back(lidar_data[i], lidar_data[i+1], lidar_data[i+2]);
             lidar_intensities.push_back(lidar_data[i+3]);
-
+            //原始点
             pcl::PointXYZI point;
             point.x = lidar_data[i];
             point.y = lidar_data[i + 1];
             point.z = lidar_data[i + 2];
             point.intensity = lidar_data[i + 3];
-            laser_cloud.push_back(point);
+            laser_cloud_RAW.push_back(point); //point 原始
+            //对原始点云进行校准
+            //Intrinsic calibration of the vertical angle of laser fibers (take the same correction for all lasers)
+            Eigen::Vector3d ptraw(point.x, point.y, point.z);
+            Eigen::Vector3d rotationVector = ptraw.cross(Eigen::Vector3d(0., 0., 1.));
+            rotationVector.normalize(); //得到旋转轴单位向量
+            Eigen::Matrix3d rotationScan; //旋转矩阵
+            rotationScan = Eigen::AngleAxisd(ANGLE_CALIB * M_PI / 180.0, rotationVector);
+            Eigen::Vector3d ptcalib = rotationScan * ptraw;
+            
+            pcl::PointXYZI point_calib;
+            point_calib.x = ptcalib.x();
+            point_calib.y = ptcalib.y();
+            point_calib.z = ptcalib.z();
+            point_calib.intensity = point.intensity;
+
+            laser_cloud.push_back(point_calib); //point
         }
         // 信息？
         sensor_msgs::PointCloud2 laser_cloud_msg;
@@ -160,6 +180,12 @@ int main(int argc, char** argv)
         laser_cloud_msg.header.stamp = ros::Time().fromSec(timestamp);
         laser_cloud_msg.header.frame_id = "/camera_init";
         pub_laser_cloud.publish(laser_cloud_msg);//发布到 tpic : "/velodyne_points"
+        //也发布原始点云 在rviz中展示 观察区别
+        sensor_msgs::PointCloud2 laser_cloud_msg_RAW;
+        pcl::toROSMsg(laser_cloud_RAW, laser_cloud_msg_RAW); 
+        laser_cloud_msg_RAW.header.stamp = ros::Time().fromSec(timestamp);
+        laser_cloud_msg_RAW.header.frame_id = "/camera_init";
+        pub_laser_cloud_RAW.publish(laser_cloud_msg_RAW);//发布到 tpic : "/velodyne_points_RAW"
 
         sensor_msgs::ImagePtr image_left_msg = cv_bridge::CvImage(laser_cloud_msg.header, "mono8", left_image).toImageMsg();
         sensor_msgs::ImagePtr image_right_msg = cv_bridge::CvImage(laser_cloud_msg.header, "mono8", right_image).toImageMsg();

@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 
     while (ros::ok())
     {
-        std::cout<<fullPointsBuf.empty()<<endl;
+        // std::cout<<fullPointsBuf.empty()<<endl;
         ros::spinOnce();
 
         // std::cout<<fullPointsBuf.empty()<<endl;

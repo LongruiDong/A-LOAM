@@ -52,11 +52,15 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
+#include <iostream>
+#include <fstream>
+#include <stdlib.h>
 
 using std::atan2;
 using std::cos;
 using std::sin;
-
+using namespace std;
+ofstream outvangle;
 //扫描周期，10hz数据，周期0.1s
 const double scanPeriod = 0.1;
 
@@ -92,6 +96,8 @@ bool PUB_EACH_LINE = false;//用于调试
 double MINIMUM_RANGE = 0.1; //距离？
 //类型模板声明 PoinT
 template <typename PointT>
+#define Lowerbound -24.9
+#define Upperbound 2
 //去除较近点云
 void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
                               pcl::PointCloud<PointT> &cloud_out, float thres)
@@ -138,7 +144,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 
     //去除输入点云的无效点；去除MINIMUM_RANGE之内的点云
     pcl::removeNaNFromPointCloud(laserCloudIn, laserCloudIn, indices);
-    removeClosedPointCloud(laserCloudIn, laserCloudIn, MINIMUM_RANGE);
+    // removeClosedPointCloud(laserCloudIn, laserCloudIn, MINIMUM_RANGE);
 
 
     int cloudSize = laserCloudIn.points.size();//点云数量
@@ -160,7 +166,8 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     //printf("end Ori %f\n", endOri);
     //lidar扫描线是否过半？ 半圆
     bool halfPassed = false;
-    
+    // outvangle.open("/home/dlr/imlslam/vert_angle-f" + //vert_angle-f .txt 
+	// 				std::to_string(systemInitCount) + ".txt");
     //把点云归为64线束*
     int count = cloudSize;
     PointType point;
@@ -171,10 +178,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         point.y = laserCloudIn.points[i].y;
         point.z = laserCloudIn.points[i].z;
 
-        //点的仰角
+        //点的仰角范围  -24.8°,2°  calib:-24.58,2.22°
         float angle = atan(point.z / sqrt(point.x * point.x + point.y * point.y)) * 180 / M_PI;
         int scanID = 0; //点输入的扫描光束
-
+        // outvangle << angle <<endl;
         if (N_SCANS == 16)
         {
             scanID = int((angle + 15) / 2 + 0.5);//四舍五入
@@ -194,18 +201,33 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             }
         }
         else if (N_SCANS == 64)
-        {   
-            if (angle >= -8.83) //这个值是怎么来的， 24.33 8.83
-                scanID = int((2 - angle) * 3.0 + 0.5);
+        {   /*
+            if (angle >= -8.61) //这个值是怎么来的， 24.33 8.83  0.22 -8.61
+                scanID = int((2.22 - angle) * 3.0 + 0.5); //2 2.22
             else
-                scanID = N_SCANS / 2 + int((-8.83 - angle) * 2.0 + 0.5);
-
-            // use [0 50]  > 50 remove outlies 过滤点 只挑选[0，50]线的点
-            if (angle > 2 || angle < -24.33 || scanID > 50 || scanID < 0)
+                scanID = N_SCANS / 2 + int((-8.61 - angle) * 2.0 + 0.5);
+            
+            // use [0 50]  > 50 remove outlies 过滤点 只挑选[0，50]线的点  -24.33+0.22=-24.11
+            if (angle > 2.22 || angle < -24.11 || scanID > 50 || scanID < 0)
             {
                 count--;
                 continue;//下个点
             }
+            */
+            float _factor = (N_SCANS - 1) / (Upperbound - Lowerbound);//原始loam中的方式
+            scanID = int((angle - Lowerbound) * _factor + 0.5);//从上到下 63-0
+            if (scanID > 63){//有的店的仰角达Ub以上，也把他收进来test
+                scanID = 63;
+            }
+            if (scanID < 0){//有的店的仰角达Lb以下，也把他收进来test
+                scanID = 0;
+            }
+            if (scanID > 63 || scanID < 0) //去除了仰角较小的id 可调
+            {
+                count--;
+                continue;//下个点
+            }
+            // scanID = 0;
         }
         else
         {
@@ -213,7 +235,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             ROS_BREAK();
         }
         // printf("yang angle %f scanID %d \n", angle, scanID);//输出仰角和光束id
-
+        /*
         float ori = -atan2(point.y, point.x);//该点方位角
         if (!halfPassed)//初始false
         {   //确保ori - startOri在[-pi/2,3pi/2] 为何是这个范围？
@@ -244,21 +266,23 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
                 ori -= 2 * M_PI;
             }
         }
+        */
         //[-0.5,1.5] 点旋转的角度与整个周期旋转角度的比率，即点云中点的相对扫描时间 为何有负值？
-        float relTime = (ori - startOri) / (endOri - startOri);
-        point.intensity = scanID + scanPeriod * relTime;//该点的强度=线号+点的时间(小数) 没有使用原始数据中的intensity(是什么)
+        // float relTime = (ori - startOri) / (endOri - startOri);
+        // point.intensity = scanID + scanPeriod * relTime;//该点的强度=线号+点的时间(小数) 没有使用原始数据中的intensity(是什么)
+        point.intensity = 1;
         laserCloudScans[scanID].push_back(point);//把点分别存入对应的线号的容器保存
     }
-    
+    // outvangle.close();
     cloudSize = count;//过滤后的点数，有效范围内的所有点
     printf("points size after pre-process scan %d : %d \n", systemInitCount, cloudSize);
 
     pcl::PointCloud<PointType>::Ptr laserCloud(new pcl::PointCloud<PointType>());
     for (int i = 0; i < N_SCANS; i++)
     {//因为曲率的计算需要点前后各使用5个点，所有每个线号起始点跳过前5个，末尾点去掉后5个，存储了每线点有曲率的点的索引（有用吗）
-        scanStartInd[i] = laserCloud->size() + 5;
+        // scanStartInd[i] = laserCloud->size() + 5;
         *laserCloud += laserCloudScans[i];//将所有点按照线号从小到大放入一个容器
-        scanEndInd[i] = laserCloud->size() - 6;
+        // scanEndInd[i] = laserCloud->size() - 6;
     }
 
     systemInitCount++;
@@ -273,7 +297,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         
         // return; //哈哈，这里怎么敢return！
     }
-    else
+    /*else
     {//前10帧还需要计算4类特征点 并发布
         printf("prepare time before select edge&planar %f \n", t_prepare.toc());//提取特征前的准备时间
         //计算曲率
@@ -465,7 +489,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         surfPointsLessFlat2.header.frame_id = "/camera_init";
         pubSurfPointsLessFlat.publish(surfPointsLessFlat2);
 
-    }
+    }*/
     
 
     /********************/
@@ -519,13 +543,13 @@ int main(int argc, char **argv)
     pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);//处理后的总点云，传给下个节点
 
     //***** to do 以下四个节点 不一定发布 只在前10帧才有发布
-    pubCornerPointsSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 100);
+    // pubCornerPointsSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 100);
 
-    pubCornerPointsLessSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_sharp", 100);
+    // pubCornerPointsLessSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_sharp", 100);
 
-    pubSurfPointsFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_flat", 100);
+    // pubSurfPointsFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_flat", 100);
 
-    pubSurfPointsLessFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 100);
+    // pubSurfPointsLessFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 100);
     //******
 
     // pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_remove_points", 100);//没有发布啊 没有用到

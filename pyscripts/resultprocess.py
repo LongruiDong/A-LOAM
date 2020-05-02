@@ -26,11 +26,12 @@ def fileToNumpy(filename):
         index += 1
     return dataArray
 
-
+#/home/dlr/Downloads/imlsresult/imls-04.txt  /home/dlr/Downloads/imlsresult
 path_file = "/home/dlr/imlslam/src/A-LOAM/result"
-filename = "04raw-svd.txt" #
+filename = "raw-04-calib-2imap-ds7orrdor.txt" #
 fullpath = os.path.join(path_file, filename)
 dataArray = fileToNumpy(fullpath)
+print(filename[4:6])
 # 使用数据集中给定的相机-lidar的校准文件把原始结果中的lidar坐标系转为相机坐标系！ calib_velo_to_cam.txt
 # T_CV = np.load("/home/dlr/kitti/odometry_raw/2011_09_30/calib/T_CV.npy") #seq04-10
 
@@ -48,11 +49,26 @@ Tcv = np.r_[T_CV,np.array([[0,0,0,1]])]
 #                 [9.999773098287e-01,-1.805528627661e-03,-6.496203536139e-03,-3.339968064433e-01],
 #                 [0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00]])
 print(Tcv)
+'''
+R_cv = np.array([[-1.857739385241e-03,-9.999659513510e-01,-8.039975204516e-03],
+                 [-6.481465826011e-03,8.051860151134e-03,-9.999466081774e-01],
+                 [9.999773098287e-01,-1.805528627661e-03,-6.496203536139e-03]])
+R_m = np.array([[0,-1,0],
+                 [0,0,-1],
+                 [1,0,0]])
+R_delta = np.matmul(R_cv, np.linalg.inv(R_m))
+ola_cv = tf.transformations.euler_from_matrix(R_cv, axes='szyx')
+ola_m = tf.transformations.euler_from_matrix(R_m, axes='rzyx')
+ola_delta = tf.transformations.euler_from_matrix(R_delta, axes='szyx')
+print(ola_cv)
+print(ola_m)
+print(ola_delta)
+'''
 Tvc = np.linalg.inv(Tcv) #注意这里！
 
 for j in range(dataArray.shape[0]):
     dataArray[j] = np.matmul(dataArray[j], Tvc) # Twv*Tvc=Twc
-
+    # dataArray[j] = np.matmul(dataArray[j], Tcv) #Twc * Tcv = Twv
 #m = dataArray.shape[0]
 T0 = dataArray[0] #(4,4)
 # R0 = T0[0:3, 0:3]
@@ -64,7 +80,8 @@ for k in range(dataArray.shape[0]): #1089
     dataArray[k] = np.matmul(T0_inv, T_k)
 
 
-f = open("/home/dlr/imlslam/src/A-LOAM/result/04-svd-200-m100-r2k20.txt", "w") #保存为新的gt位姿，初始为单位矩阵
+# f = open(path_file + "/04-calib-2imap-scan.txt", "w") #保存为新的gt位姿，初始为单位矩阵
+f = open(path_file + "/" + filename[4:], "w")
 for j in range(dataArray.shape[0]):
     slidt = [dataArray[j,0,0], dataArray[j,0,1], dataArray[j,0,2], dataArray[j,0,3],
                 dataArray[j,1,0], dataArray[j,1,1], dataArray[j,1,2], dataArray[j,1,3],
